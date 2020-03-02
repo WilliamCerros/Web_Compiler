@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JukeBox 2.0</title>
+</head>
+<style>
+  body{
+    background-color: blanchedalmond;
+  }
+  div{
+    padding-right: 100px;
+  }
+  button{
+    margin-right: 315px;
+  }
+</style>
+<script
+  src="https://code.jquery.com/jquery-3.4.1.js"
+  integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU="
+  crossorigin="anonymous">
+</script>
+<script>
+  //This RegEx will indicate when user is assigning an audio file to a variable
+  const variable_def = /(.+)(=)(.+)['/mp3']/gi;
+  //Map will contain variables as keys, and their audio files as key values
+  let variable_map = new Map();
+  //Array will hold a list of audio files that have been invoked to play
+  let playlist = [];
+  //Index will be used to iterate through playlist
+  let index = 0;
+  //Delay will prevent our mp3 files from playing simultaneously
+  const index_ms_offset = 66560;
+
+  //Function will place each line from textarea into an array
+  //We then call analyze_task and pass our array as a parameter.
+  function parse_input(){
+    //raw_input array will contain a line by line split of textarea
+    const raw_input = document.getElementById('user_input').value.split('\n');
+    //Each index will be analyzed to determine if line is a variable assignment, or variable invocation
+    analyze_task(raw_input);
+  }
+
+  //Function analyzes each line from textarea and determines if it is a variable assignment or playing the audio file
+  //If user plays an unspecified note, user is prompted for the .mp3 file they wish to associate with variable
+  function analyze_task(raw_input){
+    //Check each line and determine if we are doing variable assignment or variable invocation
+    for(let i=0; i<raw_input.length;i++){
+      //Removing any whitespace from line
+      if(/\s/g.test(raw_input[i])){
+        raw_input[i] = raw_input[i].replace(/\s/g, '');
+      }
+      //If line matches our RegEx then it is a variable assignment/reassignment
+      if(variable_def.test(raw_input[i])){
+        const line = raw_input[i].toString();
+        //Getting index of '='
+        const index = line.indexOf('=');
+        //Extracting variable name from line
+        const variable = line.substring(0,index);
+        //Extracting song file name
+        const music_file = line.substring(index+1, line.length+1);
+        //Creating a new audio object, pairing it with variable in our map
+        const audio_file = new Audio(music_file);
+        variable_map.set(variable, audio_file);
+      }
+      //Line must be variable invocation
+      else{
+        //Checking for Error: User calls variable that has not been defined yet
+        //User is given the opportunity to give an .mp3 file name to assign to variable and play file
+        if(!variable_map.has(raw_input[i])){
+          const error_message = 'Variable: ' +raw_input[i]+ ' has not been defined yet. Please specify a music file to assign: ';
+          const file_name = window.prompt(error_message);
+          const audio_file = new Audio(file_name);
+          variable_map.set(raw_input[i], audio_file);
+          playlist.push(audio_file);
+        }
+        //Variable has been defined, smooth sailing
+        else{
+          const audio_file = variable_map.get(raw_input[i]);
+          playlist.push(audio_file);
+        }
+      }
+    }
+    //Once we have parsed through each line of the text area, we can play the music
+    play_music();
+    //Once we have played the music we output a compiled code to second textarea
+    compile_code();
+  }
+
+  //Loop through playlist and play every mp3 file
+  function play_music(){
+    while(index < playlist.length){
+      const song = playlist[index];
+      setTimeout(function(){
+        song.play();
+      }, index_ms_offset*index);
+      index++;
+    }
+  }
+
+  function compile_code(){
+    let code_output='';
+    for(let i = 0; i<playlist.length; i++){
+      const audio_file = playlist[i].src;
+      code_output = code_output + "setTimeout( function(){";
+      code_output = code_output + "new Audio('"+audio_file+"').play()";
+      code_output = code_output + "}, " + index_ms_offset + " * " + i + "); "
+    }
+    //Adding a new line after generated JavaScript code
+    code_output += '\n';
+    let htmlTEMPLATE = "<!doctype html>";
+    htmlTEMPLATE = htmlTEMPLATE + "<html><head><\/head><body>";
+    htmlTEMPLATE = htmlTEMPLATE + "<script>@@@PLAY_CODE<\/script>";
+    htmlTEMPLATE = htmlTEMPLATE + "<\/body><\/html>";
+    //Using RegEx so our HTML code gets displayed nicely
+    htmlTEMPLATE = htmlTEMPLATE.replace(/>/gi, '>\n');
+    $("#compiled_code").val(htmlTEMPLATE.replace("@@@PLAY_CODE", code_output));
+  }
+
+</script>
+<body>
+<h1 align="center"> Welcome to the Juke Box</h1>
+<div>
+  <div align="left">
+    <h2> Music Generator</h2>
+    <textarea id='user_input' rows='15' cols='50'></textarea>
+    <br>
+    <button onclick='parse_input()'>Submit</button>
+  </div>
+  <div align="right"  id='left_div'>
+    <p> Welcome to the Juke Box</p>
+  </div>
+  <br>
+  <h2>Compiled Code</h2>
+  <textarea id="compiled_code" rows = '15' cols="50"></textarea>
+</div>
+</body>
+</html>
